@@ -1,4 +1,5 @@
 #ifdef USE_ESP32
+#include <cstring>
 #include "esp32_dac_generator.h"
 
 namespace esphome {

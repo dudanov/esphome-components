@@ -3,7 +3,6 @@
 #ifdef USE_ESP32
 #include <type_traits>
 #include <cstdint>
-#include <cstring>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <driver/i2s.h>
@@ -64,30 +63,6 @@ class Generator : public output::FloatOutput {
   static void s_start(int rate, int dma_buf_len, int dma_buf_count);
   static void gen_task(void *param);
 };
-
-#if 0
-/// Generate square signal on DAC#1: f = rate / 4, duty: 1/4 and modulated with f = rate / 256, duty: 1/2.
-class IRProximitySensor : public Generator {
- public:
-  IRProximitySensor() : Generator(38000 * 8, 128, 8) {}
-  /// Optional. Overrided for demonstration purposes only.
-  void update_frequency(float frequency) override { set_rate(static_cast<uint32_t>(frequency * 8.0f)); }
-
- protected:
-  void write_state(float state) override { this->level_ = static_cast<uint8_t>(state * 255.0f); }
-  /// Method for generate samples
-  size_t get_samples(DACSample *samples, const size_t nsamples) override {
-    for (auto end = samples + nsamples; samples != end; ++samples, ++this->phase_) {
-      samples->ch1_right = (this->phase_ & 0x2107) ? 0 : this->level_;
-    }
-    return nsamples;
-  }
-  /// Phase counter
-  unsigned phase_{};
-  /// Output DAC level
-  uint8_t level_{};
-};
-#endif
 
 }  // namespace esp32_dac_generator
 }  // namespace esphome
