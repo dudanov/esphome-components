@@ -5,6 +5,7 @@ from esphome.components import output
 from esphome.const import CONF_MODE, CONF_NUMBER, CONF_PIN
 from esphome.components.esp32_dac.output import valid_dac_pin
 
+AUTO_LOAD = ["output"]
 DEPENDENCIES = ["esp32"]
 
 esp32_dac_generator_ns = cg.esphome_ns.namespace("esp32_dac_generator")
