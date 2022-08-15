@@ -13,15 +13,22 @@ namespace i2s_audio {
 
 static const char *const TAG = "audio";
 
-static bool has_url_scheme(const std::string &s1, const char *s2, size_t len) {
-  return strlen_P(s2) == len && !strncmp_P(s1.c_str(), s2, len);
-}
+class UrlSchemeHelper {
+ public:
+  UrlSchemeHelper(const std::string &url) : url_(url), idx_(url.find(':')) {}
+  bool is_none(size_t min, size_t max) const { return idx_ < min || idx_ > max; }
+  bool has_scheme(const char *s1) const { strlen_P(s1) == idx_ && !strncmp_P(url_.c_str(), s1, idx_); }
+
+ private:
+  const std::string &url_;
+  const size_t idx_;
+};
 
 static UrlScheme get_url_scheme(const std::string &url) {
-  auto idx = url.find(':');
-  if (idx < 4 || idx > 5)
+  UrlSchemeHelper s(url);
+  if (s.is_none(4, 5))
     return None;
-  if (has_url_scheme(url, PSTR("http"), idx) || has_url_scheme(url, PSTR("https"), idx))
+  if (s.has_scheme(PSTR("http")) || s.has_scheme(PSTR("https")))
     return Http;
   return None;
 }
