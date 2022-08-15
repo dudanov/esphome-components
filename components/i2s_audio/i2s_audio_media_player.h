@@ -7,12 +7,19 @@
 #include "esphome/core/gpio.h"
 #include "esphome/core/helpers.h"
 
-#include <AudioFileSourceHTTPStream.h>
-#include <AudioGeneratorMP3.h>
-#include <AudioOutputI2S.h>
+class AudioFileSource;
+class AudioGenerator;
+class AudioOutput;
 
 namespace esphome {
 namespace i2s_audio {
+
+enum UrlScheme {
+  None,
+  Http,
+  SdCard,
+  Fs,
+};
 
 class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
  public:
@@ -42,11 +49,13 @@ class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
   void set_volume_(float volume, bool publish = true);
   void stop_();
 
+  template<typename T> bool create_source(UrlScheme scheme);
   bool open_url(const std::string &url);
 
   AudioFileSource *source_;
   AudioGenerator *decoder_;
   AudioOutput *output_;
+  UrlScheme scheme_{None};
 
   uint8_t dout_pin_{0};
   uint8_t din_pin_{0};

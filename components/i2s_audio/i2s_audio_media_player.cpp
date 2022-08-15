@@ -5,44 +5,56 @@
 #include "esphome/core/log.h"
 #include "pgmspace.h"
 
+#include "AudioFileSourceHTTPStream.h"
+#include "AudioFileSourceSD.h"
+
 namespace esphome {
 namespace i2s_audio {
 
 static const char *const TAG = "audio";
 
-enum DataSource {
-  Unknown,
-  Http,
-  SdCard,
-  Fs,
-};
-
-static bool has_protocol(const std::string &s1, const char *s2, size_t len) {
+static bool has_url_scheme(const std::string &s1, const char *s2, size_t len) {
   return strlen_P(s2) == len && !strncmp_P(s1.c_str(), s2, len);
 }
 
-static DataSource get_source(const std::string &url) {
+static UrlScheme get_url_scheme(const std::string &url) {
   auto idx = url.find(':');
   if (idx < 2 || idx > 5)
-    return Unknown;
-  if (has_protocol(url, PSTR("http"), idx) || has_protocol(url, PSTR("https"), idx))
+    return None;
+  if (has_url_scheme(url, PSTR("http"), idx) || has_url_scheme(url, PSTR("https"), idx))
     return Http;
-  if (has_protocol(url, PSTR("sd"), idx))
+  if (has_url_scheme(url, PSTR("sd"), idx))
     return SdCard;
-  if (has_protocol(url, PSTR("fs"), idx))
+  if (has_url_scheme(url, PSTR("fs"), idx))
     return Fs;
-  return Unknown;
+  return None;
+}
+
+template<typename T>
+bool I2SAudioMediaPlayer::create_source(UrlScheme scheme) {
+  this->source_ = new T();
+  if (this->source_ == nullptr)
+    return false;
+  this->scheme_ = scheme;
+  return true;
 }
 
 bool I2SAudioMediaPlayer::open_url(const std::string &url) {
-  get_source(url);
-
-  _port = (protocol == "https" ? 443 : 80);
-  _secure = (protocol == "https");
-
+  auto scheme = get_url_scheme(url);
+  if (scheme == UrlScheme::None)
+    return false;
+  if (this->scheme_ == scheme)
+    return true;
   if (this->source_ != nullptr)
     delete this->source_;
-  this->source_ = new AudioFileSourceHTTPStream(url);
+  if (scheme == UrlScheme::Http)
+    this->source_ = new AudioFileSourceHTTPStream();
+  else if (scheme == UrlScheme::SdCard)
+    this->source_ = new AudioFileSourceSD();
+  if (this->source_ == nullptr)
+    return false;
+  this->scheme_ = scheme;
+  return true;
 }
 
 void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
