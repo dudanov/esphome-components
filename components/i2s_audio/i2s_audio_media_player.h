@@ -42,7 +42,7 @@ class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
   void set_volume_(float volume, bool publish = true);
   void stop_();
 
-  void open_http_source(const char *url);
+  bool open_url(const std::string &url);
 
   AudioFileSource *source_;
   AudioGenerator *decoder_;

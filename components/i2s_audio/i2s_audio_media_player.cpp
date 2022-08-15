@@ -3,17 +3,46 @@
 #ifdef USE_ESP32_FRAMEWORK_ARDUINO
 
 #include "esphome/core/log.h"
+#include "pgmspace.h"
 
 namespace esphome {
 namespace i2s_audio {
 
 static const char *const TAG = "audio";
 
-void I2SAudioMediaPlayer::open_http_source(const char *url) {
+enum DataSource {
+  Unknown,
+  Http,
+  SdCard,
+  Fs,
+};
+
+static bool has_protocol(const std::string &s1, const char *s2, size_t len) {
+  return strlen_P(s2) == len && !strncmp_P(s1.c_str(), s2, len);
+}
+
+static DataSource get_source(const std::string &url) {
+  auto idx = url.find(':');
+  if (idx < 2 || idx > 5)
+    return Unknown;
+  if (has_protocol(url, PSTR("http"), idx) || has_protocol(url, PSTR("https"), idx))
+    return Http;
+  if (has_protocol(url, PSTR("sd"), idx))
+    return SdCard;
+  if (has_protocol(url, PSTR("fs"), idx))
+    return Fs;
+  return Unknown;
+}
+
+bool I2SAudioMediaPlayer::open_url(const std::string &url) {
+  get_source(url);
+
+  _port = (protocol == "https" ? 443 : 80);
+  _secure = (protocol == "https");
+
   if (this->source_ != nullptr)
     delete this->source_;
   this->source_ = new AudioFileSourceHTTPStream(url);
-
 }
 
 void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
