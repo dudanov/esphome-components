@@ -19,24 +19,11 @@ static bool has_url_scheme(const std::string &s1, const char *s2, size_t len) {
 
 static UrlScheme get_url_scheme(const std::string &url) {
   auto idx = url.find(':');
-  if (idx < 2 || idx > 5)
+  if (idx < 4 || idx > 5)
     return None;
   if (has_url_scheme(url, PSTR("http"), idx) || has_url_scheme(url, PSTR("https"), idx))
     return Http;
-  if (has_url_scheme(url, PSTR("sd"), idx))
-    return SdCard;
-  if (has_url_scheme(url, PSTR("fs"), idx))
-    return Fs;
   return None;
-}
-
-template<typename T>
-bool I2SAudioMediaPlayer::create_source(UrlScheme scheme) {
-  this->source_ = new T();
-  if (this->source_ == nullptr)
-    return false;
-  this->scheme_ = scheme;
-  return true;
 }
 
 bool I2SAudioMediaPlayer::open_url(const std::string &url) {
@@ -45,12 +32,12 @@ bool I2SAudioMediaPlayer::open_url(const std::string &url) {
     return false;
   if (this->scheme_ == scheme)
     return true;
-  if (this->source_ != nullptr)
+  if (this->source_ != nullptr) {
     delete this->source_;
+    this->source_ = nullptr;
+  }
   if (scheme == UrlScheme::Http)
     this->source_ = new AudioFileSourceHTTPStream();
-  else if (scheme == UrlScheme::SdCard)
-    this->source_ = new AudioFileSourceSD();
   if (this->source_ == nullptr)
     return false;
   this->scheme_ = scheme;

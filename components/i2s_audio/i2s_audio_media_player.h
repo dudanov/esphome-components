@@ -17,8 +17,6 @@ namespace i2s_audio {
 enum UrlScheme {
   None,
   Http,
-  SdCard,
-  Fs,
 };
 
 class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
@@ -49,7 +47,6 @@ class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
   void set_volume_(float volume, bool publish = true);
   void stop_();
 
-  template<typename T> bool create_source(UrlScheme scheme);
   bool open_url(const std::string &url);
 
   AudioFileSource *source_;
