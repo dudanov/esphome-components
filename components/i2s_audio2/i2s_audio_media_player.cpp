@@ -7,8 +7,8 @@
 
 #include "AudioFileSourceHTTPStream.h"
 #include "AudioFileSourceSD.h"
-#include "AudioGenerator.h"
 #include "AudioOutputI2S.h"
+#include "AudioGeneratorMP3.h"
 
 namespace esphome {
 namespace i2s_audio {
@@ -67,6 +67,7 @@ void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
         this->decoder_->stop();
       this->high_freq_.start();
       this->source_->open(this->url_.get().c_str());
+      ESP_LOGD(TAG, "Open URL: %s", this->url_.get().c_str());
       this->decoder_->begin(this->source_, this->output_);
       this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
     }
@@ -160,22 +161,28 @@ void I2SAudioMediaPlayer::stop_() {
 
 void I2SAudioMediaPlayer::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Audio...");
+  this->decoder_ = new AudioGeneratorMP3();
   if (this->internal_dac_mode_) {
     this->output_ = new AudioOutputI2S(0, 1);
   } else {
     auto i2s = new AudioOutputI2S();
     i2s->SetPinout(this->bclk_pin_, this->lrclk_pin_, this->dout_pin_);
     i2s->SetOutputModeMono(this->external_dac_channels_ == 1);
+    this->output_ = i2s;
     if (this->mute_pin_ != nullptr) {
       this->mute_pin_->setup();
       this->mute_pin_->digital_write(false);
     }
   }
+  this->output_->begin();
   this->state = media_player::MEDIA_PLAYER_STATE_IDLE;
 }
 
 void I2SAudioMediaPlayer::loop() {
-  this->decoder_->loop();
+  if (this->decoder_ != nullptr && this->decoder_->isRunning()) {
+    if (!this->decoder_->loop())
+      this->decoder_->stop();
+  }
   if (this->state == media_player::MEDIA_PLAYER_STATE_PLAYING && !this->decoder_->isRunning()) {
     this->stop_();
     this->publish_state();
