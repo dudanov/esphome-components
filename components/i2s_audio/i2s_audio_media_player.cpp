@@ -13,7 +13,9 @@ namespace i2s_audio {
 
 static const char *const TAG = "audio";
 
-bool UrlSchemeHelper::set(std::string url) {
+bool Url::set(const std::string &url) {
+  if (this->url_ == url)
+    return false;
   auto p = strstr_P(url.c_str(), PSTR("://"));
   if (p == nullptr)
     return false;
@@ -25,35 +27,30 @@ bool UrlSchemeHelper::set(std::string url) {
     return false;
   if ((ext - sch) < 4 || (url.size() - ext) < 3)
     return false;
-  this->url_ = std::move(url);
+  this->url_ = url;
   this->sch_ = sch;
   this->ext_ = ext + 1;
   return true;
 }
 
-bool UrlSchemeHelper::has_scheme_P(const char *s) const {
-  return strlen_P(s) == this->sch_ && !strncmp_P(this->url_.c_str(), s, this->sch_);
-}
-
-static UrlScheme get_url_scheme(const std::string &url) {
-  UrlSchemeHelper s;
-  s.set(url);
-  if (s.has_scheme_P(PSTR("http"), PSTR("https")))
-    return Http;
-  return None;
+Url::Scheme Url::get_scheme() const {
+  if (this->has_scheme_P(PSTR("http"), PSTR("https")))
+    return Url::Scheme::Http;
+  return Url::Scheme::None;
 }
 
 bool I2SAudioMediaPlayer::open_url(const std::string &url) {
-  auto scheme = get_url_scheme(url);
-  if (scheme == UrlScheme::None)
+  if (!this->url_.set(url))
     return false;
+  const auto scheme = this->url_.get_scheme();
   if (this->scheme_ == scheme)
-    return true;
+    return scheme != Url::Scheme::None;
   if (this->source_ != nullptr) {
     delete this->source_;
     this->source_ = nullptr;
+    this->scheme_ = Url::Scheme::None;
   }
-  if (scheme == UrlScheme::Http)
+  if (scheme == Url::Scheme::Http)
     this->source_ = new AudioFileSourceHTTPStream();
   if (this->source_ == nullptr)
     return false;

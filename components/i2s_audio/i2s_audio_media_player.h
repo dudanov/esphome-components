@@ -6,6 +6,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/gpio.h"
 #include "esphome/core/helpers.h"
+#include <pgmspace.h>
 
 class AudioFileSource;
 class AudioGenerator;
@@ -14,27 +15,29 @@ class AudioOutput;
 namespace esphome {
 namespace i2s_audio {
 
-class UrlSchemeHelper {
+class Url {
  public:
-  UrlSchemeHelper() = default;
-  UrlSchemeHelper(std::string url) { this->set(std::move(url)); }
-  bool set(std::string url);
+  Url() = default;
+  Url(const std::string &url) { this->set(url); }
+  bool set(const std::string &url);
   const std::string &get() const { return this->url_; }
   const char *ext() const { return &this->url_[this->ext_]; }
-  bool has_scheme_P(const char *s) const;
+  bool has_scheme_P(const char *s) const { return !strncmp_P(this->url_.c_str(), s, this->sch_); }
   template<typename... Args> bool has_scheme_P(const char *s, Args... args) const {
     return this->has_scheme_P(s) || this->has_scheme_P(args...);
   }
+
+  enum Scheme {
+    None,
+    Http,
+  };
+
+  Scheme get_scheme() const;
 
  protected:
   std::string url_{};
   size_t sch_{0};
   size_t ext_{0};
-};
-
-enum UrlScheme {
-  None,
-  Http,
 };
 
 class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
@@ -66,11 +69,13 @@ class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
   void stop_();
 
   bool open_url(const std::string &url);
+  bool update_scheme(const std::string &url);
 
-  AudioFileSource *source_;
-  AudioGenerator *decoder_;
-  AudioOutput *output_;
-  UrlScheme scheme_{None};
+  AudioFileSource *source_{};
+  AudioGenerator *decoder_{};
+  AudioOutput *output_{};
+  Url url_{};
+  Url::Scheme scheme_{};
 
   uint8_t dout_pin_{0};
   uint8_t din_pin_{0};
