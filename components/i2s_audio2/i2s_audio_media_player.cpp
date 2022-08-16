@@ -7,6 +7,8 @@
 
 #include "AudioFileSourceHTTPStream.h"
 #include "AudioFileSourceSD.h"
+#include "AudioGenerator.h"
+#include "AudioOutputI2S.h"
 
 namespace esphome {
 namespace i2s_audio {
@@ -60,11 +62,14 @@ bool I2SAudioMediaPlayer::open_url(const std::string &url) {
 
 void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
   if (call.get_media_url().has_value()) {
-    if (this->decoder_->isRunning())
-      this->audio_->stopSong();
-    this->high_freq_.start();
-    this->audio_->connecttohost(call.get_media_url().value().c_str());
-    this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
+    if (this->open_url(call.get_media_url().value().c_str())) {
+      if (this->decoder_->isRunning())
+        this->decoder_->stop();
+      this->high_freq_.start();
+      this->source_->open(this->url_.get().c_str());
+      this->decoder_->begin(this->source_, this->output_);
+      this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
+    }
   }
   if (call.get_volume().has_value()) {
     this->volume = call.get_volume().value();
@@ -78,11 +83,12 @@ void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
           this->decoder_->begin(this->source_, this->output_);
         this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
         break;
-      case media_player::MEDIA_PLAYER_COMMAND_PAUSE:
-        if (this->audio_->isRunning())
-          this->audio_->pauseResume();
-        this->state = media_player::MEDIA_PLAYER_STATE_PAUSED;
-        break;
+      /*      case media_player::MEDIA_PLAYER_COMMAND_PAUSE:
+              if (this->audio_->isRunning())
+                this->audio_->pauseResume();
+              this->state = media_player::MEDIA_PLAYER_STATE_PAUSED;
+              break;
+      */
       case media_player::MEDIA_PLAYER_COMMAND_STOP:
         this->stop_();
         break;
@@ -92,15 +98,16 @@ void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
       case media_player::MEDIA_PLAYER_COMMAND_UNMUTE:
         this->unmute_();
         break;
-      case media_player::MEDIA_PLAYER_COMMAND_TOGGLE:
-        this->audio_->pauseResume();
-        if (this->audio_->isRunning()) {
-          this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
-        } else {
-          this->state = media_player::MEDIA_PLAYER_STATE_PAUSED;
-        }
-        break;
-      case media_player::MEDIA_PLAYER_COMMAND_VOLUME_UP: {
+      /*      case media_player::MEDIA_PLAYER_COMMAND_TOGGLE:
+              this->audio_->pauseResume();
+              if (this->audio_->isRunning()) {
+                this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
+              } else {
+                this->state = media_player::MEDIA_PLAYER_STATE_PAUSED;
+              }
+              break;
+      */
+      case media_player::MEDIA_PLAYER_COMMAND_VOLUME_UP : {
         float new_volume = this->volume + 0.1f;
         if (new_volume > 1.0f)
           new_volume = 1.0f;
@@ -137,27 +144,28 @@ void I2SAudioMediaPlayer::unmute_() {
   }
   this->muted_ = false;
 }
+
 void I2SAudioMediaPlayer::set_volume_(float volume, bool publish) {
-  this->audio_->setVolume(remap<uint8_t, float>(volume, 0.0f, 1.0f, 0, 21));
+  this->output_->SetGain(volume);
   if (publish)
     this->volume = volume;
 }
 
 void I2SAudioMediaPlayer::stop_() {
-  if (this->audio_->isRunning())
-    this->audio_->stopSong();
+  if (this->decoder_->isRunning())
+    this->decoder_->stop();
   this->high_freq_.stop();
   this->state = media_player::MEDIA_PLAYER_STATE_IDLE;
 }
 
 void I2SAudioMediaPlayer::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Audio...");
-  if (this->internal_dac_mode_ != I2S_DAC_CHANNEL_DISABLE) {
-    this->audio_ = make_unique<Audio>(true, this->internal_dac_mode_);
+  if (this->internal_dac_mode_) {
+    this->output_ = new AudioOutputI2S(0, 1);
   } else {
-    this->audio_ = make_unique<Audio>(false);
-    this->audio_->setPinout(this->bclk_pin_, this->lrclk_pin_, this->dout_pin_);
-    this->audio_->forceMono(this->external_dac_channels_ == 1);
+    auto i2s = new AudioOutputI2S();
+    i2s->SetPinout(this->bclk_pin_, this->lrclk_pin_, this->dout_pin_);
+    i2s->SetOutputModeMono(this->external_dac_channels_ == 1);
     if (this->mute_pin_ != nullptr) {
       this->mute_pin_->setup();
       this->mute_pin_->digital_write(false);
@@ -167,8 +175,8 @@ void I2SAudioMediaPlayer::setup() {
 }
 
 void I2SAudioMediaPlayer::loop() {
-  this->audio_->loop();
-  if (this->state == media_player::MEDIA_PLAYER_STATE_PLAYING && !this->audio_->isRunning()) {
+  this->decoder_->loop();
+  if (this->state == media_player::MEDIA_PLAYER_STATE_PLAYING && !this->decoder_->isRunning()) {
     this->stop_();
     this->publish_state();
   }
@@ -176,7 +184,7 @@ void I2SAudioMediaPlayer::loop() {
 
 media_player::MediaPlayerTraits I2SAudioMediaPlayer::get_traits() {
   auto traits = media_player::MediaPlayerTraits();
-  traits.set_supports_pause(true);
+  traits.set_supports_pause(false);
   return traits;
 };
 
@@ -185,21 +193,6 @@ void I2SAudioMediaPlayer::dump_config() {
   if (this->is_failed()) {
     ESP_LOGCONFIG(TAG, "Audio failed to initialize!");
     return;
-  }
-  if (this->internal_dac_mode_ != I2S_DAC_CHANNEL_DISABLE) {
-    switch (this->internal_dac_mode_) {
-      case I2S_DAC_CHANNEL_LEFT_EN:
-        ESP_LOGCONFIG(TAG, "  Internal DAC mode: Left");
-        break;
-      case I2S_DAC_CHANNEL_RIGHT_EN:
-        ESP_LOGCONFIG(TAG, "  Internal DAC mode: Right");
-        break;
-      case I2S_DAC_CHANNEL_BOTH_EN:
-        ESP_LOGCONFIG(TAG, "  Internal DAC mode: Left & Right");
-        break;
-      default:
-        break;
-    }
   }
 }
 

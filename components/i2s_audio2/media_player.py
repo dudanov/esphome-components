@@ -16,10 +16,6 @@ I2SAudioMediaPlayer = i2s_audio_ns.class_(
     "I2SAudioMediaPlayer", cg.Component, media_player.MediaPlayer
 )
 
-AudioFileSource = cg.global_ns.class_("AudioFileSource")
-AudioFileSourceHTTPStream = cg.global_ns.class_("AudioFileSourceHTTPStream", AudioFileSource)
-
-
 i2s_dac_mode_t = cg.global_ns.enum("i2s_dac_mode_t")
 
 CONF_I2S_DOUT_PIN = "i2s_dout_pin"
@@ -43,7 +39,7 @@ CONFIG_SCHEMA = cv.All(
             "internal": cv.Schema(
                 {
                     cv.GenerateID(): cv.declare_id(I2SAudioMediaPlayer),
-                    cv.Required(CONF_MODE): cv.enum(INTERNAL_DAC_OPTIONS, lower=True),
+                    #cv.Required(CONF_MODE): cv.enum(INTERNAL_DAC_OPTIONS, lower=True),
                 }
             )
             .extend(media_player.MEDIA_PLAYER_SCHEMA)
@@ -81,7 +77,7 @@ async def to_code(config):
     await media_player.register_media_player(var, config)
 
     if config[CONF_DAC_TYPE] == "internal":
-        cg.add(var.set_internal_dac_mode(config[CONF_MODE]))
+        cg.add(var.set_internal_dac_mode(True))
     else:
         cg.add(var.set_dout_pin(config[CONF_I2S_DOUT_PIN]))
         cg.add(var.set_bclk_pin(config[CONF_I2S_BCLK_PIN]))
@@ -94,5 +90,7 @@ async def to_code(config):
     if CORE.is_esp32:
         cg.add_library("WiFiClientSecure", None)
         cg.add_library("HTTPClient", None)
-        cg.add_library("esphome/ESP32-audioI2S", "2.1.0")
-        cg.add_build_flag("-DAUDIO_NO_SD_FS")
+        cg.add_library(None, None, "https://github.com/dudanov/ESP8266Audio")
+        #cg.add_library("esphome/ESP32-audioI2S", "2.1.0")
+        #cg.add_build_flag("-DAUDIO_NO_SD_FS")
+        cg.add_platformio_option("lib_deps_builtin", "SPI")
