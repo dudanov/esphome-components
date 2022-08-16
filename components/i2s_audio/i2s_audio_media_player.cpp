@@ -17,9 +17,12 @@ class UrlSchemeHelper {
  public:
   UrlSchemeHelper(const std::string &url) : url_(url), idx_(url.find(':')) {}
   bool is_none(size_t min, size_t max) const { return idx_ < min || idx_ > max; }
-  bool has_scheme(const char *s1) const { strlen_P(s1) == idx_ && !strncmp_P(url_.c_str(), s1, idx_); }
+  template<typename... Args> bool has_scheme(const char *s, Args... args) const {
+    return strlen_P(s) == idx_ && !strncmp_P(url_.c_str(), s, idx_) && this->has_scheme(args);
+  }
 
  private:
+  bool has_scheme() const { return true; }
   const std::string &url_;
   const size_t idx_;
 };
@@ -28,7 +31,7 @@ static UrlScheme get_url_scheme(const std::string &url) {
   UrlSchemeHelper s(url);
   if (s.is_none(4, 5))
     return None;
-  if (s.has_scheme(PSTR("http")) || s.has_scheme(PSTR("https")))
+  if (s.has_scheme(PSTR("http"), PSTR("https")))
     return Http;
   return None;
 }
