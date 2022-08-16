@@ -14,6 +14,24 @@ class AudioOutput;
 namespace esphome {
 namespace i2s_audio {
 
+class UrlSchemeHelper {
+ public:
+  UrlSchemeHelper() = default;
+  UrlSchemeHelper(std::string url) { this->set(std::move(url)); }
+  bool set(std::string url);
+  const std::string &get() const { return this->url_; }
+  const char *ext() const { return &this->url_[this->ext_]; }
+  bool has_scheme_P(const char *s) const;
+  template<typename... Args> bool has_scheme_P(const char *s, Args... args) const {
+    return this->has_scheme_P(s) || this->has_scheme_P(args...);
+  }
+
+ protected:
+  std::string url_{};
+  size_t sch_{0};
+  size_t ext_{0};
+};
+
 enum UrlScheme {
   None,
   Http,

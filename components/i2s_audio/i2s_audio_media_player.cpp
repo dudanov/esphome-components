@@ -13,25 +13,31 @@ namespace i2s_audio {
 
 static const char *const TAG = "audio";
 
-class UrlSchemeHelper {
- public:
-  UrlSchemeHelper(const std::string &url)
-      : url_(url), idx_(std::distance(url.c_str(), strstr_P(url.c_str(), PSTR("://")))) {}
-  bool is_none(size_t min, size_t max) const { return idx_ < min || idx_ > max; }
-  template<typename... Args> bool has_scheme_P(const char *s, Args... args) const {
-    return strlen_P(s) == idx_ && !strncmp_P(url_.c_str(), s, idx_) && has_scheme_P(args);
-  }
+bool UrlSchemeHelper::set(std::string url) {
+  auto p = strstr_P(url.c_str(), PSTR("://"));
+  if (p == nullptr)
+    return false;
+  auto sch = p - url.c_str();
+  if (sch < 2)
+    return false;
+  auto ext = url.rfind('.');
+  if (ext == std::string::npos || sch > ext)
+    return false;
+  if ((ext - sch) < 4 || (url.size() - ext) < 3)
+    return false;
+  this->url_ = std::move(url);
+  this->sch_ = sch;
+  this->ext_ = ext + 1;
+  return true;
+}
 
- private:
-  bool has_scheme_P() const { return true; }
-  const std::string &url_;
-  const size_t idx_;
-};
+bool UrlSchemeHelper::has_scheme_P(const char *s) const {
+  return strlen_P(s) == this->sch_ && !strncmp_P(this->url_.c_str(), s, this->sch_);
+}
 
 static UrlScheme get_url_scheme(const std::string &url) {
-  UrlSchemeHelper s(url);
-  if (s.is_none(4, 5))
-    return None;
+  UrlSchemeHelper s;
+  s.set(url);
   if (s.has_scheme_P(PSTR("http"), PSTR("https")))
     return Http;
   return None;
