@@ -46,8 +46,6 @@ I2SAudioMediaPlayer::Decoder I2SAudioMediaPlayer::decoder() const {
     return Decoder::Mp3;
   if (this->url_.has_extension_P(PSTR("aac")))
     return Decoder::Aac;
-  if (this->url_.has_extension_P(PSTR("ogg")))
-    return Decoder::Vorbis;
   if (this->url_.has_extension_P(PSTR("opus")))
     return Decoder::Opus;
   if (this->url_.has_extension_P(PSTR("flac")))

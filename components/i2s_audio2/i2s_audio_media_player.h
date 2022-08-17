@@ -76,7 +76,6 @@ class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
   enum Decoder {
     None,
     Mp3,
-    Vorbis,
     Opus,
     Flac,
     Aac,
