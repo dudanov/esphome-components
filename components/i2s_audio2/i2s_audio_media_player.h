@@ -21,18 +21,15 @@ class Url {
   Url(const std::string &url) { this->set(url); }
   bool set(const std::string &url);
   const std::string &get() const { return this->url_; }
-  const char *ext() const { return &this->url_[this->ext_]; }
+  const char *extension() const { return &this->url_[this->ext_]; }
   bool has_scheme_P(const char *s) const { return !strncmp_P(this->url_.c_str(), s, this->sch_); }
+  bool has_extension_P(const char *s) const { return !strcasecmp_P(this->extension(), s); }
   template<typename... Args> bool has_scheme_P(const char *s, Args... args) const {
     return this->has_scheme_P(s) || this->has_scheme_P(args...);
   }
-
-  enum Scheme {
-    None,
-    Http,
-  };
-
-  Scheme get_scheme() const;
+  template<typename... Args> bool has_extension_P(const char *s, Args... args) const {
+    return this->has_extension_P(s) || this->has_extension_P(args...);
+  }
 
  protected:
   std::string url_{};
@@ -71,11 +68,32 @@ class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
   bool open_url(const std::string &url);
   bool update_scheme(const std::string &url);
 
+  enum Scheme {
+    None,
+    Http,
+  };
+
+  enum Decoder {
+    None,
+    Mp3,
+    Vorbis,
+    Opus,
+    Flac,
+    Aac,
+    Gme,
+    Midi,
+    Mod,
+    Wave,
+  };
+
+  Scheme scheme() const;
+  Decoder decoder() const;
+
   AudioFileSource *source_{};
   AudioGenerator *decoder_{};
   AudioOutput *output_{};
   Url url_{};
-  Url::Scheme scheme_{};
+  Scheme scheme_{};
 
   uint8_t dout_pin_{0};
   uint8_t din_pin_{0};

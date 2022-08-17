@@ -35,24 +35,48 @@ bool Url::set(const std::string &url) {
   return true;
 }
 
-Url::Scheme Url::get_scheme() const {
-  if (this->has_scheme_P(PSTR("http"), PSTR("https")))
-    return Url::Scheme::Http;
-  return Url::Scheme::None;
+I2SAudioMediaPlayer::Scheme I2SAudioMediaPlayer::scheme() const {
+  if (this->url_.has_scheme_P(PSTR("http"), PSTR("https")))
+    return Scheme::Http;
+  return Scheme::None;
+}
+
+I2SAudioMediaPlayer::Decoder I2SAudioMediaPlayer::decoder() const {
+  if (this->url_.has_extension_P(PSTR("mp3")))
+    return Decoder::Mp3;
+  if (this->url_.has_extension_P(PSTR("aac")))
+    return Decoder::Aac;
+  if (this->url_.has_extension_P(PSTR("ogg")))
+    return Decoder::Vorbis;
+  if (this->url_.has_extension_P(PSTR("opus")))
+    return Decoder::Opus;
+  if (this->url_.has_extension_P(PSTR("flac")))
+    return Decoder::Flac;
+  if (this->url_.has_extension_P(PSTR("midi")))
+    return Decoder::Midi;
+  if (this->url_.has_extension_P(PSTR("mod")))
+    return Decoder::Mod;
+  if (this->url_.has_extension_P(PSTR("wav")))
+    return Decoder::Wave;
+  if (this->url_.has_extension_P(PSTR("ay"), PSTR("gbs"), PSTR("gym"), PSTR("hes"), PSTR("kss"), PSTR("nsf"),
+                                 PSTR("nsfe"), PSTR("sap"), PSTR("spc"), PSTR("rsn"), PSTR("vgm"), PSTR("vgz"))) {
+    return Decoder::Gme;
+  }
+  return Decoder::None;
 }
 
 bool I2SAudioMediaPlayer::open_url(const std::string &url) {
   if (!this->url_.set(url))
     return false;
-  const auto scheme = this->url_.get_scheme();
+  const auto scheme = this->scheme();
   if (this->scheme_ == scheme)
-    return scheme != Url::Scheme::None;
+    return scheme != Scheme::None;
   if (this->source_ != nullptr) {
     delete this->source_;
     this->source_ = nullptr;
-    this->scheme_ = Url::Scheme::None;
+    this->scheme_ = Scheme::None;
   }
-  if (scheme == Url::Scheme::Http)
+  if (scheme == Scheme::Http)
     this->source_ = new AudioFileSourceHTTPStream();
   if (this->source_ == nullptr)
     return false;
@@ -108,7 +132,7 @@ void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
               }
               break;
       */
-      case media_player::MEDIA_PLAYER_COMMAND_VOLUME_UP : {
+      case media_player::MEDIA_PLAYER_COMMAND_VOLUME_UP: {
         float new_volume = this->volume + 0.1f;
         if (new_volume > 1.0f)
           new_volume = 1.0f;
