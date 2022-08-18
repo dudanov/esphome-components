@@ -6,9 +6,16 @@
 #include "pgmspace.h"
 
 #include "AudioFileSourceHTTPStream.h"
-#include "AudioFileSourceSD.h"
+#include "AudioFileSourceBuffer.h"
 #include "AudioOutputI2S.h"
+#include "AudioGeneratorAAC.h"
+#include "AudioGeneratorFLAC.h"
+#include "AudioGeneratorGme.h"
+#include "AudioGeneratorMIDI.h"
+#include "AudioGeneratorMOD.h"
 #include "AudioGeneratorMP3.h"
+#include "AudioGeneratorOpus.h"
+#include "AudioGeneratorWAV.h"
 
 namespace esphome {
 namespace i2s_audio {
@@ -16,8 +23,6 @@ namespace i2s_audio {
 static const char *const TAG = "audio";
 
 bool Url::set(const std::string &url) {
-  if (this->url_ == url)
-    return false;
   auto p = strstr_P(url.c_str(), PSTR("://"));
   if (p == nullptr)
     return false;
@@ -37,60 +42,113 @@ bool Url::set(const std::string &url) {
 
 I2SAudioMediaPlayer::Scheme I2SAudioMediaPlayer::scheme() const {
   if (this->url_.has_scheme_P(PSTR("http"), PSTR("https")))
-    return Scheme::Http;
-  return Scheme::None;
+    return SCHEME_HTTP;
+  return SCHEME_NONE;
 }
 
 I2SAudioMediaPlayer::Decoder I2SAudioMediaPlayer::decoder() const {
   if (this->url_.has_extension_P(PSTR("mp3")))
-    return Decoder::Mp3;
+    return DECODER_MP3;
   if (this->url_.has_extension_P(PSTR("aac")))
-    return Decoder::Aac;
+    return DECODER_AAC;
   if (this->url_.has_extension_P(PSTR("opus")))
-    return Decoder::Opus;
+    return DECODER_OPUS;
   if (this->url_.has_extension_P(PSTR("flac")))
-    return Decoder::Flac;
+    return DECODER_FLAC;
   if (this->url_.has_extension_P(PSTR("midi")))
-    return Decoder::Midi;
+    return DECODER_MIDI;
   if (this->url_.has_extension_P(PSTR("mod")))
-    return Decoder::Mod;
+    return DECODER_MOD;
   if (this->url_.has_extension_P(PSTR("wav")))
-    return Decoder::Wave;
+    return DECODER_WAVE;
   if (this->url_.has_extension_P(PSTR("ay"), PSTR("gbs"), PSTR("gym"), PSTR("hes"), PSTR("kss"), PSTR("nsf"),
                                  PSTR("nsfe"), PSTR("sap"), PSTR("spc"), PSTR("rsn"), PSTR("vgm"), PSTR("vgz"))) {
-    return Decoder::Gme;
+    return DECODER_GME;
   }
-  return Decoder::None;
+  return DECODER_NONE;
 }
 
 bool I2SAudioMediaPlayer::open_url(const std::string &url) {
+  if (this->state == media_player::MEDIA_PLAYER_STATE_PLAYING && this->url_.get() == url)
+    return false;
   if (!this->url_.set(url))
     return false;
   const auto scheme = this->scheme();
-  if (this->scheme_ == scheme)
-    return scheme != Scheme::None;
-  if (this->source_ != nullptr) {
-    delete this->source_;
-    this->source_ = nullptr;
-    this->scheme_ = Scheme::None;
-  }
-  if (scheme == Scheme::Http)
-    this->source_ = new AudioFileSourceHTTPStream();
+  if (scheme == SCHEME_NONE)
+    return false;
+  const auto decoder = this->decoder();
+  if (decoder == DECODER_NONE)
+    return false;
+  if (this->generator_ != nullptr && this->generator_->isRunning())
+    this->generator_->stop();
+  //if (this->decoder_ != decoder) {
+    if (this->generator_ != nullptr) {
+      delete this->generator_;
+      this->generator_ = nullptr;
+      this->decoder_ = DECODER_NONE;
+    }
+    if (decoder == DECODER_MP3)
+      this->generator_ = new AudioGeneratorMP3();
+    else if (decoder == DECODER_AAC)
+      this->generator_ = new AudioGeneratorAAC();
+    else if (decoder == DECODER_OPUS)
+      this->generator_ = new AudioGeneratorOpus();
+    else if (decoder == DECODER_FLAC)
+      this->generator_ = new AudioGeneratorFLAC();
+    else if (decoder == DECODER_MIDI)
+      this->generator_ = new AudioGeneratorMIDI();
+    else if (decoder == DECODER_MOD)
+      this->generator_ = new AudioGeneratorMOD();
+    else if (decoder == DECODER_WAVE)
+      this->generator_ = new AudioGeneratorWAV();
+    else if (decoder == DECODER_GME) {
+      this->generator_ = new AudioGeneratorGme();
+      ESP_LOGD(TAG, "Create GME player: %d", this->generator_);
+    }
+  //}
+  if (this->generator_ == nullptr)
+    return false;
+  this->decoder_ = decoder;
+  if (this->source_ != nullptr && this->source_->isOpen())
+    this->source_->close();
+  //if (this->scheme_ != scheme) {
+    if (this->source_ != nullptr) {
+      delete this->source_;
+      this->source_ = nullptr;
+      this->scheme_ = SCHEME_NONE;
+    }
+    if (scheme == SCHEME_HTTP)
+      this->source_ = new AudioFileSourceHTTPStream();
+  //}
   if (this->source_ == nullptr)
     return false;
   this->scheme_ = scheme;
+  this->generator_->RegisterStatusCB(
+      [](void *, int code, const char *msg) { ESP_LOGD(TAG, "Status: %d, %s", code, msg); }, nullptr);
+  this->generator_->RegisterMetadataCB(
+      [](void *, const char *type, bool, const char *msg) { ESP_LOGD(TAG, "Metadata: %s = %s", type, msg); }, nullptr);
+  this->source_->open(url.c_str());
+  if (this->buffer_ != nullptr)
+    delete this->buffer_;
+  this->buffer_ = new AudioFileSourceBuffer(this->source_, 4096);
+  this->generator_->begin(this->buffer_, this->output_);
+  this->high_freq_.start();
   return true;
 }
 
 void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
   if (call.get_media_url().has_value()) {
     if (this->open_url(call.get_media_url().value().c_str())) {
-      if (this->decoder_->isRunning())
-        this->decoder_->stop();
-      this->high_freq_.start();
-      this->source_->open(this->url_.get().c_str());
+      //if (this->generator_->isRunning())
+        //this->generator_->stop();
+      //this->source_->open(this->url_.get().c_str());
       ESP_LOGD(TAG, "Open URL: %s", this->url_.get().c_str());
-      this->decoder_->begin(this->source_, this->output_);
+      // this->output_->SetRate(48000);
+      //this->generator_->begin(this->source_, this->output_);
+      ESP_LOGD(TAG, "Size URL: %d", this->source_->getSize());
+
+      if (this->decoder_ == DECODER_GME)
+        ((AudioGeneratorGme *)this->generator_)->startTrack(0);
       this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
     }
   }
@@ -102,8 +160,10 @@ void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
   if (call.get_command().has_value()) {
     switch (call.get_command().value()) {
       case media_player::MEDIA_PLAYER_COMMAND_PLAY:
-        if (!this->decoder_->isRunning())
-          this->decoder_->begin(this->source_, this->output_);
+        if (!this->generator_->isRunning())
+          this->generator_->begin(this->source_, this->output_);
+        if (this->decoder_ == DECODER_GME)
+          static_cast<AudioGeneratorGme *>(this->generator_)->startTrack(0);
         this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
         break;
       /*      case media_player::MEDIA_PLAYER_COMMAND_PAUSE:
@@ -175,15 +235,14 @@ void I2SAudioMediaPlayer::set_volume_(float volume, bool publish) {
 }
 
 void I2SAudioMediaPlayer::stop_() {
-  if (this->decoder_->isRunning())
-    this->decoder_->stop();
+  if (this->generator_->isRunning())
+    this->generator_->stop();
   this->high_freq_.stop();
   this->state = media_player::MEDIA_PLAYER_STATE_IDLE;
 }
 
 void I2SAudioMediaPlayer::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Audio...");
-  this->decoder_ = new AudioGeneratorMP3();
   if (this->internal_dac_mode_) {
     this->output_ = new AudioOutputI2S(0, 1);
   } else {
@@ -201,11 +260,11 @@ void I2SAudioMediaPlayer::setup() {
 }
 
 void I2SAudioMediaPlayer::loop() {
-  if (this->decoder_ != nullptr && this->decoder_->isRunning()) {
-    if (!this->decoder_->loop())
-      this->decoder_->stop();
+  if (this->generator_ != nullptr && this->generator_->isRunning()) {
+    if (!this->generator_->loop())
+      this->generator_->stop();
   }
-  if (this->state == media_player::MEDIA_PLAYER_STATE_PLAYING && !this->decoder_->isRunning()) {
+  if (this->state == media_player::MEDIA_PLAYER_STATE_PLAYING && !this->generator_->isRunning()) {
     this->stop_();
     this->publish_state();
   }

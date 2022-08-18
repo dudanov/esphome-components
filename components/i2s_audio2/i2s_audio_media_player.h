@@ -69,30 +69,32 @@ class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
   bool update_scheme(const std::string &url);
 
   enum Scheme {
-    None,
-    Http,
+    SCHEME_NONE,
+    SCHEME_HTTP,
   };
 
   enum Decoder {
-    None,
-    Mp3,
-    Opus,
-    Flac,
-    Aac,
-    Gme,
-    Midi,
-    Mod,
-    Wave,
+    DECODER_NONE,
+    DECODER_MP3,
+    DECODER_OPUS,
+    DECODER_FLAC,
+    DECODER_AAC,
+    DECODER_GME,
+    DECODER_MIDI,
+    DECODER_MOD,
+    DECODER_WAVE,
   };
 
   Scheme scheme() const;
   Decoder decoder() const;
 
   AudioFileSource *source_{};
-  AudioGenerator *decoder_{};
+  AudioFileSource *buffer_{};
+  AudioGenerator *generator_{};
   AudioOutput *output_{};
   Url url_{};
   Scheme scheme_{};
+  Decoder decoder_{};
 
   uint8_t dout_pin_{0};
   uint8_t din_pin_{0};
