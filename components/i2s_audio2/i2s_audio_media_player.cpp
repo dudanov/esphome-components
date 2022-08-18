@@ -29,12 +29,15 @@ bool Url::set(const std::string &url) {
   auto sch = p - url.c_str();
   if (sch < 2)
     return false;
+  auto num = url.rfind('#');
+  if (num != std::string::npos)
+    this->track_ = atoi(&url[num + 1]);
   auto ext = url.rfind('.');
   if (ext == std::string::npos || sch > ext)
     return false;
   if ((ext - sch) < 4 || (url.size() - ext) < 3)
     return false;
-  this->url_ = url;
+  this->url_ = url.substr(0, num);
   this->sch_ = sch;
   this->ext_ = ext + 1;
   return true;
@@ -69,8 +72,15 @@ I2SAudioMediaPlayer::Decoder I2SAudioMediaPlayer::decoder() const {
 }
 
 bool I2SAudioMediaPlayer::open_url(const std::string &url) {
-  if (this->state == media_player::MEDIA_PLAYER_STATE_PLAYING && this->url_.get() == url)
+  Url n;
+  n.set(url);
+  if (this->url_.get() == n.get()) {
+    if (this->url_.track() != n.track() || this->state != media_player::MEDIA_PLAYER_STATE_PLAYING) {
+      this->url_ = std::move(n);
+      return true;
+    }
     return false;
+  }
   if (!this->url_.set(url))
     return false;
   const auto scheme = this->scheme();
@@ -101,10 +111,8 @@ bool I2SAudioMediaPlayer::open_url(const std::string &url) {
       this->generator_ = new AudioGeneratorMOD();
     else if (decoder == DECODER_WAVE)
       this->generator_ = new AudioGeneratorWAV();
-    else if (decoder == DECODER_GME) {
+    else if (decoder == DECODER_GME)
       this->generator_ = new AudioGeneratorGme();
-      ESP_LOGD(TAG, "Create GME player: %d", this->generator_);
-    }
   }
   if (this->generator_ == nullptr)
     return false;
@@ -127,11 +135,11 @@ bool I2SAudioMediaPlayer::open_url(const std::string &url) {
       [](void *, int code, const char *msg) { ESP_LOGD(TAG, "Status: %d, %s", code, msg); }, nullptr);
   this->generator_->RegisterMetadataCB(
       [](void *, const char *type, bool, const char *msg) { ESP_LOGD(TAG, "Metadata: %s = %s", type, msg); }, nullptr);
+  // if (this->buffer_ != nullptr)
+  // delete this->buffer_;
+  // this->buffer_ = new AudioFileSourceBuffer(this->source_, 4096);
   this->source_->open(url.c_str());
-  if (this->buffer_ != nullptr)
-    delete this->buffer_;
-  this->buffer_ = new AudioFileSourceBuffer(this->source_, 4096);
-  this->generator_->begin(this->buffer_, this->output_);
+  this->generator_->begin(this->source_, this->output_);
   this->high_freq_.start();
   return true;
 }
@@ -148,7 +156,7 @@ void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
       ESP_LOGD(TAG, "Size URL: %d", this->source_->getSize());
 
       if (this->decoder_ == DECODER_GME)
-        ((AudioGeneratorGme *) this->generator_)->PlayTrack(0);
+        ((AudioGeneratorGme *) this->generator_)->PlayTrack(this->url_.track());
       this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
     }
   }
@@ -160,36 +168,34 @@ void I2SAudioMediaPlayer::control(const media_player::MediaPlayerCall &call) {
   if (call.get_command().has_value()) {
     switch (call.get_command().value()) {
       case media_player::MEDIA_PLAYER_COMMAND_PLAY:
-        if (!this->generator_->isRunning())
-          this->generator_->begin(this->source_, this->output_);
-        if (this->decoder_ == DECODER_GME)
-          static_cast<AudioGeneratorGme *>(this->generator_)->PlayTrack(0);
-        this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
+        // if (!this->generator_->isRunning())
+        // this->generator_->begin(this->source_, this->output_);
+        // if (this->decoder_ == DECODER_GME)
+        // static_cast<AudioGeneratorGme *>(this->generator_)->PlayTrack(0);
+        // this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
         break;
-      /*      case media_player::MEDIA_PLAYER_COMMAND_PAUSE:
-              if (this->audio_->isRunning())
-                this->audio_->pauseResume();
-              this->state = media_player::MEDIA_PLAYER_STATE_PAUSED;
-              break;
-      */
+      case media_player::MEDIA_PLAYER_COMMAND_PAUSE:
+        //        if (this->audio_->isRunning())
+        //         this->audio_->pauseResume();
+        //     this->state = media_player::MEDIA_PLAYER_STATE_PAUSED;
+        break;
       case media_player::MEDIA_PLAYER_COMMAND_STOP:
-        this->stop_();
+        // this->stop_();
         break;
       case media_player::MEDIA_PLAYER_COMMAND_MUTE:
-        this->mute_();
+        // this->mute_();
         break;
       case media_player::MEDIA_PLAYER_COMMAND_UNMUTE:
-        this->unmute_();
+        // this->unmute_();
         break;
-      /*      case media_player::MEDIA_PLAYER_COMMAND_TOGGLE:
-              this->audio_->pauseResume();
-              if (this->audio_->isRunning()) {
-                this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
-              } else {
-                this->state = media_player::MEDIA_PLAYER_STATE_PAUSED;
-              }
-              break;
-      */
+      case media_player::MEDIA_PLAYER_COMMAND_TOGGLE:
+        //        this->audio_->pauseResume();
+        //      if (this->audio_->isRunning()) {
+        //      this->state = media_player::MEDIA_PLAYER_STATE_PLAYING;
+        //        } else {
+        //        this->state = media_player::MEDIA_PLAYER_STATE_PAUSED;
+        //     }
+        break;
       case media_player::MEDIA_PLAYER_COMMAND_VOLUME_UP: {
         float new_volume = this->volume + 0.1f;
         if (new_volume > 1.0f)
@@ -260,14 +266,17 @@ void I2SAudioMediaPlayer::setup() {
 }
 
 void I2SAudioMediaPlayer::loop() {
-  if (this->generator_ != nullptr && this->generator_->isRunning()) {
-    if (!this->generator_->loop())
+  if (this->generator_ != nullptr) {
+    this->generator_->loop();
+    if (!this->generator_->isRunning()) {
       this->generator_->stop();
+      this->state = media_player::MEDIA_PLAYER_STATE_IDLE;
+    }
   }
-  if (this->state == media_player::MEDIA_PLAYER_STATE_PLAYING && !this->generator_->isRunning()) {
-    this->stop_();
-    this->publish_state();
-  }
+  // if (this->state == media_player::MEDIA_PLAYER_STATE_PLAYING && !this->generator_->isRunning()) {
+  // this->stop_();
+  // this->publish_state();
+  //}
 }
 
 media_player::MediaPlayerTraits I2SAudioMediaPlayer::get_traits() {

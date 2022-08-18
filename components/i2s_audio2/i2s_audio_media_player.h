@@ -21,6 +21,7 @@ class Url {
   Url(const std::string &url) { this->set(url); }
   bool set(const std::string &url);
   const std::string &get() const { return this->url_; }
+  int track() const { return this->track_; }
   const char *extension() const { return &this->url_[this->ext_]; }
   bool has_scheme_P(const char *s) const { return !strncmp_P(this->url_.c_str(), s, this->sch_); }
   bool has_extension_P(const char *s) const { return !strcasecmp_P(this->extension(), s); }
@@ -35,6 +36,7 @@ class Url {
   std::string url_{};
   size_t sch_{0};
   size_t ext_{0};
+  int track_{0};
 };
 
 class I2SAudioMediaPlayer : public Component, public media_player::MediaPlayer {
