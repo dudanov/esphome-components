@@ -73,7 +73,9 @@ I2SAudioMediaPlayer::Decoder I2SAudioMediaPlayer::decoder() const {
 
 bool I2SAudioMediaPlayer::open_url(const std::string &url) {
   Url n;
-  n.set(url);
+  if (!n.set(url))
+    return false;
+  
   if (this->url_.get() == n.get()) {
     if (this->url_.track() != n.track() || this->state != media_player::MEDIA_PLAYER_STATE_PLAYING) {
       this->url_ = std::move(n);
@@ -81,8 +83,9 @@ bool I2SAudioMediaPlayer::open_url(const std::string &url) {
     }
     return false;
   }
-  if (!this->url_.set(url))
-    return false;
+  
+  this->url_ = std::move(n);
+
   const auto scheme = this->scheme();
   if (scheme == SCHEME_NONE)
     return false;
