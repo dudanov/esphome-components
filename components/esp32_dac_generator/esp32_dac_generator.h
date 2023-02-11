@@ -1,12 +1,12 @@
 #pragma once
 
 #ifdef USE_ESP32
-#include <type_traits>
 #include <cstdint>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #include <driver/i2s.h>
 #include <esphome/components/output/float_output.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <type_traits>
 
 namespace esphome {
 namespace esp32_dac_generator {
@@ -22,13 +22,13 @@ struct DACSample {
   uint8_t ignored2_;
 
  public:
-  uint8_t ch2_left;
+  uint8_t ch1_right;
 
  protected:
   uint8_t ignored1_;
 
  public:
-  uint8_t ch1_right;
+  uint8_t ch2_left;
 };
 
 /// DAC generator class
@@ -49,7 +49,7 @@ class Generator : public output::FloatOutput {
  protected:
   Generator() = delete;
   Generator(const Generator &) = delete;
-  explicit Generator(int rate, int dma_buf_len, int dma_buf_count);
+  explicit Generator(uint32_t rate, int dma_buf_len, int dma_buf_count);
   virtual ~Generator() { stop(); }
 
   /// Samples generator method. Must be overriden.
@@ -60,7 +60,7 @@ class Generator : public output::FloatOutput {
   static DACSample *s_samples;
   static size_t s_nsamples;
   static TaskHandle_t s_task;
-  static void s_start(int rate, int dma_buf_len, int dma_buf_count);
+  static void s_start(uint32_t rate, int dma_buf_len, int dma_buf_count);
   static void gen_task(void *param);
 };
 
