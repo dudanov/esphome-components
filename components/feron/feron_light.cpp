@@ -24,7 +24,7 @@ LightTraits FeronLightOutput::get_traits() {
 }
 
 void FeronLightOutput::transmit_(uint16_t address, uint16_t command) {
-  NECData data(address, command + ~command * 256);
+  NECData data = {address, command + ~command * 256};
 #if ESPHOME_VERSION_CODE >= VERSION_CODE(2023, 12, 0)
   data.command_repeats = 1;
 #endif
@@ -48,7 +48,7 @@ void FeronLightOutput::write_state(LightState *state) {
   this->transmit_(address, command);
 }
 
-void FeronLightOutput::preset_load(unsigned preset, bool force = false) {
+void FeronLightOutput::preset_load(unsigned preset, bool force) {
   preset %= 16;
   ESP_LOGD(TAG, "Loading state from EEPROM preset: %d", preset);
   this->transmit_(FERON_ADDRESS_NATIVE, preset + force * 16);
