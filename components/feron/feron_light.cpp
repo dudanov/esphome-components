@@ -25,7 +25,9 @@ LightTraits FeronLightOutput::get_traits() {
 }
 
 void FeronLightOutput::transmit_(uint16_t address, uint16_t command) {
-  NECData data = {address, command + ~command * 256};
+  NECData data;
+  data.address = address;
+  data.command = ~command * 256 + command;
 #if ESPHOME_VERSION_CODE >= VERSION_CODE(2023, 12, 0)
   data.command_repeats = 1;
 #endif
