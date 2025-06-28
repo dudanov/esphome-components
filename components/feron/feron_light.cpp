@@ -44,7 +44,7 @@ void FeronLightOutput::write_state(LightState *state) {
 
   if (brightness > 0.0f) {
     address = this->fade_ ? FERON_ADDRESS_DIM_BH : FERON_ADDRESS_SET_BH;
-    command = static_cast<uint16_t>(0.5f + brightness * 15.0f) * 16 + static_cast<uint16_t>(15.5f - color * 15.0f);
+    command = 16 * uint16_t(0.5f + brightness * 15) + uint16_t(15.5f - color * 15);
   }
 
   ESP_LOGD(TAG, "Set color: %f, brightness: %f. NEC command: 0x%02X", color, brightness, command);
