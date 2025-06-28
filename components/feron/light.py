@@ -27,6 +27,7 @@ CONFIG_SCHEMA = light.LIGHT_SCHEMA.extend(
             device_class=DEVICE_CLASS_SWITCH,
             entity_category=ENTITY_CATEGORY_CONFIG,
             icon=ICON_FADE,
+            default_restore_mode="RESTORE_DEFAULT_ON",
         ),
     }
 )
