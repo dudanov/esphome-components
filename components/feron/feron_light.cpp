@@ -27,7 +27,7 @@ LightTraits FeronLightOutput::get_traits() {
 void FeronLightOutput::transmit_(uint16_t address, uint16_t command) {
   NECData data;
   data.address = address;
-  data.command = ~command * 256 + command;
+  data.command = (~command << 8) | command;
 #if ESPHOME_VERSION_CODE >= VERSION_CODE(2023, 12, 0)
   data.command_repeats = 1;
 #endif
@@ -42,7 +42,7 @@ void FeronLightOutput::write_state(LightState *state) {
   // Default to power off command
   uint16_t address = FERON_ADDRESS_NATIVE, command = FERON_POWER_OFF;
 
-  if (brightness > 0.0f) {
+  if (brightness) {
     address = this->fade_ ? FERON_ADDRESS_DIM_BH : FERON_ADDRESS_SET_BH;
     command = 16 * uint16_t(0.5f + brightness * 15) + uint16_t(15.5f - color * 15);
   }
