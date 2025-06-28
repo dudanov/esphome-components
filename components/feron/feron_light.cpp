@@ -1,3 +1,4 @@
+#include "esphome.h"
 #include "feron_light.h"
 
 namespace esphome {

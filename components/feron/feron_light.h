@@ -1,4 +1,3 @@
-// #include "esphome.h"
 #include "esphome/components/light/light_output.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/remote_base/nec_protocol.h"
