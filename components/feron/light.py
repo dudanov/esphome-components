@@ -30,7 +30,7 @@ CONFIG_SCHEMA = light.LIGHT_SCHEMA.extend(
             default_restore_mode="RESTORE_DEFAULT_ON",
         ),
     }
-)
+).extend(remote_base.REMOTE_TRANSMITTABLE_SCHEMA)
 
 
 async def to_code(config):
