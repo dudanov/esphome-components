@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import CONF_OUTPUT_ID, ENTITY_CATEGORY_CONFIG, DEVICE_CLASS_SWITCH
-from esphome.components import remote_base, light, switch
+from esphome.components import light, remote_base, switch
+from esphome.const import CONF_OUTPUT_ID, DEVICE_CLASS_SWITCH, ENTITY_CATEGORY_CONFIG
 
 AUTO_LOAD = ["light", "switch"]
 CONF_FADE_SWITCH = "fade_switch"
