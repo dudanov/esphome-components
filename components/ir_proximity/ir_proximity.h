@@ -21,20 +21,26 @@ template<ChannelsMode mode> class IRLEDModulator : public Generator {
   IRLEDModulator() : Generator(38000 * 2, 256, 8) { set_mode(mode); }
 
  protected:
-  void write_state(float state) override { this->level_ = static_cast<uint8_t>(state * 255.0f); }
+  void write_state(float state) override { this->level_ = static_cast<uint8_t>(state * 255); }
+
   size_t get_samples(DACSample *samples, const size_t nsamples) override {
     unsigned phase = this->phase_;
     const uint8_t level = this->level_;
+
     for (unsigned end = phase + nsamples; phase != end; ++samples, ++phase) {
-      const uint8_t value = (phase & 0x841) ? 0 : level;
+      const uint8_t value = (phase & 0b100001000001) ? 0 : level;
+
       if (mode == ChannelsMode::I2S_DAC_CHANNEL_LEFT_EN || mode == ChannelsMode::I2S_DAC_CHANNEL_BOTH_EN)
         samples->ch2_left = value;
+
       if (mode == ChannelsMode::I2S_DAC_CHANNEL_RIGHT_EN || mode == ChannelsMode::I2S_DAC_CHANNEL_BOTH_EN)
         samples->ch1_right = value;
     }
+
     this->phase_ = phase;
     return nsamples;
   }
+
   /// Phase of waveform
   unsigned phase_{};
   /// High level of square
