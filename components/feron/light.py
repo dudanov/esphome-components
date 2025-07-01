@@ -19,18 +19,26 @@ FeronLightOutput = feron_ns.class_(
 FadeSwitch = feron_ns.class_("FadeSwitch", switch.Switch, cg.Parented)
 
 
-CONFIG_SCHEMA = light.LIGHT_SCHEMA.extend(
-    {
-        cv.GenerateID(CONF_OUTPUT_ID): cv.declare_id(FeronLightOutput),
-        cv.Optional(CONF_FADE_SWITCH): switch.switch_schema(
-            FadeSwitch,
-            device_class=DEVICE_CLASS_SWITCH,
-            entity_category=ENTITY_CATEGORY_CONFIG,
-            icon=ICON_FADE,
-            default_restore_mode="RESTORE_DEFAULT_ON",
-        ),
-    }
-).extend(remote_base.REMOTE_TRANSMITTABLE_SCHEMA)
+CONFIG_SCHEMA = (
+    light.light_schema(
+        FeronLightOutput,
+        light.LightType.BINARY,
+        icon="mdi:light-recessed",
+        default_restore_mode="RESTORE_DEFAULT_OFF",
+    )
+    .extend(
+        {
+            cv.Optional(CONF_FADE_SWITCH): switch.switch_schema(
+                FadeSwitch,
+                device_class=DEVICE_CLASS_SWITCH,
+                entity_category=ENTITY_CATEGORY_CONFIG,
+                icon=ICON_FADE,
+                default_restore_mode="RESTORE_DEFAULT_ON",
+            ),
+        }
+    )
+    .extend(remote_base.REMOTE_TRANSMITTABLE_SCHEMA)
+)
 
 
 async def to_code(config):
